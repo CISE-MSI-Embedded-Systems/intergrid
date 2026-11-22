@@ -1,2 +1,5 @@
 build/
 .cache/
+platforms/arduino/.clangd
+.DS_Store
+ignore/

@@ -1,0 +1,21 @@
+CompileFlags:
+  Add:
+    - -xc++
+    - -std=gnu++11
+    - --target=avr
+    - -mmcu=atmega328p
+    - -DF_CPU=16000000L
+    - -DARDUINO=10607
+    - -DARDUINO_AVR_UNO
+    - -DARDUINO_ARCH_AVR
+    - -I@CMAKE_SOURCE_DIR@/include
+    - -I@CMAKE_SOURCE_DIR@
+    - -I@ARDUINO_AVR_CORE@/cores/arduino
+    - -I@ARDUINO_AVR_CORE@/variants/standard
+    - -isystem@ARDUINO_AVR_LIBC@
+---
+If:
+  PathMatch: .*\.c
+CompileFlags:
+  Remove: [-xc++, -std=gnu++11]
+  Add: [-xc, -std=gnu11]

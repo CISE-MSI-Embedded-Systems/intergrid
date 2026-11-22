@@ -1,5 +1,8 @@
 #define _DEFAULT_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
 
 #include "intergrid/intergrid.h"
 #include "intergrid/platform.h"
@@ -14,6 +17,8 @@
 #include <time.h>
 
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -50,9 +55,13 @@ struct Pf {
 };
 
 static int create_udp_rx(uint16_t port, const char *mcast_addr) {
-  int fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+  int fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (fd < 0)
     return -1;
+
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+    goto error;
 
   int reuse = 1;
   if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
@@ -231,8 +240,25 @@ static int get_sync_data(double time, double *delta, double old_delta,
     target.tv_nsec -= 1000000000L;
   }
 
-  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &target, NULL) ==
-         EINTR) {
+  for (;;) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    struct timespec remaining = {
+        .tv_sec = target.tv_sec - now.tv_sec,
+        .tv_nsec = target.tv_nsec - now.tv_nsec,
+    };
+    if (remaining.tv_nsec < 0) {
+      remaining.tv_sec--;
+      remaining.tv_nsec += 1000000000L;
+    }
+    if (remaining.tv_sec < 0)
+      break;
+
+    if (nanosleep(&remaining, NULL) == 0)
+      break;
+    if (errno != EINTR)
+      break;
   }
 
   return 0;
